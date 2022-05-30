@@ -1,0 +1,9 @@
+server:
+  host: example.com
+  port: 8080
+mysql:
+  user: root
+  pwd: root
+  port: 3306
+  host: localhost
+  name: go-boilerplate
