@@ -8,6 +8,6 @@ find ${project_name} -type f -exec sed -i "s/go-boilerplate/$project_name/g" {} 
 
 rm -r ${project_name}/.git &&
 rm ${project_name}/install.sh &&
-rm ${project_name}/go-boilerplate
-
+rm ${project_name}/go-boilerplate &&
+rm ${project_name}/README.md
 
