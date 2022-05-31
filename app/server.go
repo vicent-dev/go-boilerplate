@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
@@ -26,5 +27,5 @@ func NewServer() *server {
 }
 
 func (s *server) Run() error {
-	return http.ListenAndServe(s.c.Server.Host+s.c.Server.Port, s.r)
+	return http.ListenAndServe(s.c.Server.Host+s.c.Server.Port, handlers.RecoveryHandler()(s.r))
 }
