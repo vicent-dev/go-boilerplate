@@ -4,12 +4,12 @@ read -p "Insert project name: " project_name
 
 git clone git@github.com:vicent-dev/go-boilerplate.git ${project_name} &&
 
-project_name_db = echo project_name | sed 's/_/-/'
+project_name_underscore = echo project_name | sed "s/-/_/g"
 
 find ${project_name} -type f -exec sed -i "s/go-boilerplate/$project_name/g" {} + &&
-find ${project_name} -type f -exec sed -i "s/go_boilerplate/$project_name_db/g" {} + &&
+find ${project_name} -type f -exec sed -i "s/go_boilerplate/$project_name_underscore/g" {} + &&
 
-rm -r ${project_name}/.git &&
+sudo rm -r ${project_name}/.git &&
 rm ${project_name}/install.sh &&
 rm ${project_name}/go-boilerplate &&
 rm ${project_name}/README.md
