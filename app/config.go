@@ -12,13 +12,13 @@ type config struct {
 		Host string `yaml:"host"`
 		Port string `yaml:"port"`
 	} `yaml:"server"`
-	Mysql struct {
+	Db struct {
 		User string `yaml:"user"`
 		Pwd  string `yaml:"pwd"`
 		Port string `yaml:"port"`
 		Host string `yaml:"host"`
 		Name string `yaml:"name"`
-	} `yaml:"mysql"`
+	} `yaml:"db"`
 }
 
 func loadConfig() *config {

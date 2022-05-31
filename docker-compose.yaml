@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    container_name: go-boilerplate
+    ports:
+      - 8080:8080
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - go-boilerplate
+  mariadb:
+    image: mariadb:10.7
+    container_name: mariadb
+    ports:
+      - 3306:3306
+    volumes:
+      - dbvolume:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=go_boilerplate
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - go-boilerplate
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+volumes:
+  dbvolume:
+
+networks:
+  go-boilerplate:

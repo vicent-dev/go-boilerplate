@@ -27,5 +27,5 @@ func NewServer() *server {
 }
 
 func (s *server) Run() error {
-	return http.ListenAndServe(s.c.Server.Host+s.c.Server.Port, handlers.RecoveryHandler()(s.r))
+	return http.ListenAndServe(":"+s.c.Server.Port, handlers.RecoveryHandler()(s.r))
 }

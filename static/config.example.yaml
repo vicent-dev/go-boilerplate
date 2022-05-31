@@ -1,9 +1,9 @@
 server:
-  host: example.com
+  host: 127.0.0.1
   port: 8080
-mysql:
+db:
   user: root
   pwd: root
   port: 3306
-  host: localhost
-  name: go-boilerplate
+  host: mariadb
+  name: go_boilerplate
