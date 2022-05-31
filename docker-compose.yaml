@@ -13,7 +13,7 @@ services:
       - go-boilerplate
   mariadb:
     image: mariadb:10.7
-    container_name: mariadb
+    container_name: mariadb-go-boilerplate
     ports:
       - 3306:3306
     volumes:
