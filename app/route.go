@@ -1,6 +1,10 @@
 package app
 
-import "net/http"
+import (
+	"github.com/en-vee/alog"
+	"net/http"
+	"time"
+)
 
 func (s *server) routes() {
 	s.r.Use(loggingMiddleware)
@@ -8,6 +12,14 @@ func (s *server) routes() {
 
 	//ping example
 	s.r.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("{\"ping\": \"pong\"}"))
+		response := make(map[string]interface{})
+		response["ping"] = "pong pong"
+
+		err := s.produce("ping", []byte("Ping sent "+time.Now().String()))
+		if err != nil {
+			alog.Debug(err.Error())
+		}
+
+		s.writeResponse(w, response)
 	}).Methods("GET")
 }

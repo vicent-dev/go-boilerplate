@@ -7,3 +7,8 @@ db:
   port: 3306
   host: mariadb
   name: go_boilerplate
+amqp:
+  user: guest
+  pwd: guest
+  port: 5672
+  host: rabbit

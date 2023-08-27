@@ -6,6 +6,7 @@ require (
 	github.com/en-vee/alog v0.0.0-20190922070830-98e6a77f6e73
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
+	github.com/rabbitmq/amqp091-go v1.8.1
 	gopkg.in/yaml.v2 v2.4.0
 	gorm.io/driver/mysql v1.3.4
 	gorm.io/gorm v1.23.5

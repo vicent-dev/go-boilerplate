@@ -19,6 +19,12 @@ type config struct {
 		Host string `yaml:"host"`
 		Name string `yaml:"name"`
 	} `yaml:"db"`
+	Amqp struct {
+		User string `yaml:"user"`
+		Pwd  string `yaml:"pwd"`
+		Port string `yaml:"port"`
+		Host string `yaml:"host"`
+	}
 }
 
 func loadConfig() *config {
