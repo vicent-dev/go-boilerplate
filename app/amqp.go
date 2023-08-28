@@ -5,15 +5,16 @@ import (
 	"fmt"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
+	"sync"
 	"time"
 )
 
 func (s *server) rabbit() {
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%s/",
-		s.c.Amqp.User,
-		s.c.Amqp.Pwd,
-		s.c.Amqp.Host,
-		s.c.Amqp.Port,
+		s.c.Rabbit.User,
+		s.c.Rabbit.Pwd,
+		s.c.Rabbit.Host,
+		s.c.Rabbit.Port,
 	))
 
 	if err != nil {
@@ -23,11 +24,40 @@ func (s *server) rabbit() {
 	s.amqp = conn
 }
 
-func (s *server) Consume(queue string) {
+func (s *server) DeclareQueues() {
+	ch, _ := s.amqp.Channel()
+
+	defer ch.Close()
+
+	for _, queue := range s.c.Rabbit.Queues {
+
+		_, _ = ch.QueueDeclare(
+			queue.Name,
+			queue.Durable,
+			queue.AutoDelete,
+			queue.Exclusive,
+			queue.NoWait,
+			nil,
+		)
+	}
+}
+
+func (s *server) RunConsummers() {
+	wg := sync.WaitGroup{}
+	wg.Add(len(s.c.Rabbit.Queues))
+
+	for _, queue := range s.c.Rabbit.Queues {
+		go s.consume(queue)
+	}
+
+	wg.Wait()
+}
+
+func (s *server) consume(queue QueueConfig) {
 	ch, _ := s.amqp.Channel()
 
 	msgs, _ := ch.Consume(
-		queue, // queue
+		queue.Name, // queue
 		"",
 		true,
 		false,
@@ -44,19 +74,19 @@ func (s *server) Consume(queue string) {
 		}
 	}()
 
-	log.Printf(" [*] Waiting for messages. To exit press CTRL+C")
+	log.Printf(fmt.Sprintf(" [*] Waiting for messages from queue %s. To exit press CTRL+C", queue.Name))
 	<-forever
 }
 
-func (s *server) produce(queue string, msg []byte) error {
+func (s *server) produce(queue QueueConfig, msg []byte) error {
 	ch, _ := s.amqp.Channel()
 
 	q, _ := ch.QueueDeclare(
-		queue,
-		false,
-		false,
-		false,
-		false,
+		queue.Name,
+		queue.Durable,
+		queue.AutoDelete,
+		queue.Exclusive,
+		queue.NoWait,
 		nil,
 	)
 

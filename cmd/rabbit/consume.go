@@ -4,6 +4,6 @@ import "go-boilerplate/app"
 
 func main() {
 	s := app.NewServer()
-
-	s.Consume("ping")
+	s.DeclareQueues()
+	s.RunConsummers()
 }

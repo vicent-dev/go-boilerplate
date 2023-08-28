@@ -15,7 +15,7 @@ func (s *server) routes() {
 		response := make(map[string]interface{})
 		response["ping"] = "pong pong"
 
-		err := s.produce("ping", []byte("Ping sent "+time.Now().String()))
+		err := s.produce(s.c.Rabbit.Queues["ping"], []byte("Ping sent "+time.Now().String()))
 		if err != nil {
 			alog.Debug(err.Error())
 		}
