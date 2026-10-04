@@ -1,0 +1,33 @@
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # follows the go directive in go.mod, so CI cannot drift from it
+          go-version-file: 'go.mod'
+
+      # static/config.yaml is embedded at compile time and gitignored, so the
+      # example stands in for it.
+      - name: Provide a config
+        run: cp static/config.example.yaml static/config.yaml
+
+      - name: Build
+        run: make install && make build
+
+      - name: Test
+        run: make test
+
+      - name: Vet
+        run: make vet

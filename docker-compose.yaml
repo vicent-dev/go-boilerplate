@@ -1,43 +1,87 @@
 services:
-  app:
-    build: .
-    container_name: go-boilerplate
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: boilerplate-api
     ports:
       - 8080:8080
-    depends_on:
-      mariadb:
-        condition: service_healthy
+    environment:
+      # the api reaches its dependencies by service name inside the network.
+      # Without this it dials localhost, which is the api container itself.
+      DB_HOST: db
+      RABBIT_HOST: rabbit
     networks:
-      - go-boilerplate
+      - boilerplate
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbit:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The worker is the same image with a different entrypoint: no listener, just
+  # the queue consumers. Scale it with `docker compose up --scale worker=3`.
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    # No container_name: compose needs to be free to name the replicas when the
+    # worker is scaled.
+    entrypoint: ["/usr/local/bin/worker"]
+    environment:
+      DB_HOST: db
+      RABBIT_HOST: rabbit
+    networks:
+      - boilerplate
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbit:
+        condition: service_healthy
+    restart: unless-stopped
+
   rabbit:
-    image: rabbitmq:management
+    image: rabbitmq:3-management-alpine
     container_name: rabbit
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:-guest}
     ports:
       - "5672:5672"
       - "15672:15672"
-    networks:
-      - go-boilerplate
-  mariadb:
-    image: mariadb:10.7
-    container_name: mariadb-go-boilerplate
-    ports:
-      - 3306:3306
     volumes:
-      - dbvolume:/var/lib/mysql
-    environment:
-      - MYSQL_DATABASE=go_boilerplate
-      - MYSQL_ROOT_PASSWORD=root
-    networks:
-      - go-boilerplate
+      - rabbitdata:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
       timeout: 5s
       retries: 10
-volumes:
-  dbvolume:
+    networks:
+      - boilerplate
+
+  db:
+    image: postgres:16-alpine
+    container_name: boilerplate-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-boilerplate}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-boilerplate}
+      POSTGRES_DB: ${DB_NAME:-boilerplate}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-boilerplate} -d ${DB_NAME:-boilerplate}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - boilerplate
 
 networks:
-  go-boilerplate:
+  boilerplate:
+
+volumes:
+  pgdata:
+  rabbitdata:

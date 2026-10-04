@@ -1,14 +1,64 @@
+# Every value supports ${VAR} and ${VAR:-default}, resolved from the process
+# environment plus a .env file loaded at startup. See app/config.go.
+#
+# This file is embedded into the binary as static/config.yaml. Copy it and edit
+# the copy; the example itself is never read at runtime.
+
 server:
-  host: 127.0.0.1
-  port: 8080
+  # 0.0.0.0 so the container is reachable from outside. Use 127.0.0.1 to keep a
+  # local process off the network.
+  host: ${SERVER_HOST:-0.0.0.0}
+  port: ${SERVER_PORT:-8080}
+
 db:
-  user: root
-  pwd: root
-  port: 3306
-  host: mariadb
-  name: go_boilerplate
-amqp:
-  user: guest
-  pwd: guest
-  port: 5672
-  host: rabbit
+  host: ${DB_HOST:-localhost}
+  port: ${DB_PORT:-5432}
+  user: ${DB_USER:-boilerplate}
+  password: ${DB_PASSWORD:-boilerplate}
+  name: ${DB_NAME:-boilerplate}
+  sslmode: ${DB_SSLMODE:-disable}
+  # size of the connection pool
+  max_conns: 100
+  max_idle: 10
+
+auth:
+  # the two secrets MUST differ, or a refresh token would validate as an access
+  # token. Override both in a real deployment.
+  access_secret: ${AUTH_ACCESS_SECRET:-change-me-access}
+  refresh_secret: ${AUTH_REFRESH_SECRET:-change-me-refresh}
+  # how long an access token is accepted before it has to be refreshed
+  access_ttl: 15m
+  refresh_ttl: 168h
+  # how long a token minted by `make genregtoken` stays valid
+  registration_token_ttl: 24h
+  issuer: ${AUTH_ISSUER:-boilerplate}
+  audience: ${AUTH_AUDIENCE:-boilerplate-clients}
+  # cost of new password hashes. 12 is the sane default; the test suite drops to
+  # bcrypt.MinCost.
+  bcrypt_cost: 12
+  # leeway allowed on token time checks, to absorb clock drift between hosts
+  clock_skew: 5s
+
+rabbit:
+  user: ${RABBIT_USER:-guest}
+  pwd: ${RABBIT_PASSWORD:-guest}
+  host: ${RABBIT_HOST:-localhost}
+  port: ${RABBIT_PORT:-5672}
+  # vhost: /
+  # The map key is the handle used to publish and consume; `name` defaults to it.
+  queues:
+    ping:
+      durable: true
+      contentType: application/json
+      # unacknowledged messages handed to a consumer at a time
+      prefetch: 10
+
+# Throttling for the /auth endpoints only, per client IP. Leave enabled: the
+# login route is the one worth guessing at.
+rate_limit:
+  enabled: true
+  # sustained requests per second, per IP. 0.2 is one request every 5s.
+  rps: 0.2
+  burst: 5
+  # how long an idle address keeps its bucket
+  idle_ttl: 10m
