@@ -11,6 +11,14 @@ services:
       # Without this it dials localhost, which is the api container itself.
       DB_HOST: db
       RABBIT_HOST: rabbit
+      # TLS: the listener serves HTTPS for any ENV other than local or test, and
+      # needs both paths to exist in the container. Uncomment this block to turn
+      # it on; it merges into the environment above.
+      # ENV: production
+      # TLS_CERT_FILE: /etc/tls/cert.pem
+      # TLS_KEY_FILE: /etc/tls/key.pem
+    # volumes:
+    #   - ./certs:/etc/tls:ro
     networks:
       - boilerplate
     depends_on:

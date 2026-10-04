@@ -9,6 +9,15 @@ server:
   # local process off the network.
   host: ${SERVER_HOST:-0.0.0.0}
   port: ${SERVER_PORT:-8080}
+  # Name of the environment the process runs in. TLS is served for anything
+  # other than local or test, so a deployment that forgets this variable fails
+  # to start over missing certificates rather than serving plaintext.
+  env: ${ENV:-local}
+  # PEM certificate and key, both required as soon as env is not local/test.
+  # Terminate TLS in a proxy instead if you would rather not hand the certs to
+  # the process: leave env at local or test for that.
+  cert_file: ${TLS_CERT_FILE:-}
+  key_file: ${TLS_KEY_FILE:-}
 
 db:
   host: ${DB_HOST:-localhost}

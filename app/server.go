@@ -39,6 +39,12 @@ type server struct {
 	queueMu sync.Mutex
 
 	httpServer http.Server
+
+	// tlsCertFile and tlsKeyFile are the PEM paths the listener serves TLS
+	// with. Both are empty when TLS is off, and neither can be empty on its own
+	// when it is on: newServer refuses to build a server otherwise.
+	tlsCertFile string
+	tlsKeyFile  string
 }
 
 // NewServer loads the configuration and builds a fully wired application:
@@ -60,6 +66,15 @@ func newServer(ctx context.Context, c *Config) (*server, error) {
 		r: mux.NewRouter(),
 		c: c,
 	}
+
+	// Resolved before anything is opened: an environment asking for TLS without
+	// shipping certificates has to fail here, not on the first connection.
+	certFile, keyFile, err := c.TLSFiles()
+	if err != nil {
+		return nil, err
+	}
+	s.tlsCertFile = certFile
+	s.tlsKeyFile = keyFile
 
 	if err := s.openDatabase(ctx); err != nil {
 		return nil, err
@@ -120,7 +135,7 @@ func (s *server) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 
 	go func() {
-		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 		close(errCh)
@@ -145,6 +160,17 @@ func (s *server) Run(ctx context.Context) error {
 	}
 
 	return <-errCh
+}
+
+// serve blocks on the listener, over TLS when the environment says to. The
+// certificate paths are already known to be set in that case: newServer refuses
+// to build a server whose TLS configuration is incomplete, so there is nothing
+// here that can quietly fall back to plaintext.
+func (s *server) serve() error {
+	if s.c.TLSEnabled() {
+		return s.httpServer.ListenAndServeTLS(s.tlsCertFile, s.tlsKeyFile)
+	}
+	return s.httpServer.ListenAndServe()
 }
 
 // Router exposes the router, so a test can drive the application without

@@ -38,6 +38,15 @@ v3 turns `access_ttl: 15m` into a `time.Duration`; yaml.v2 silently yields zero,
 which issues access tokens that expire the moment they are minted.
 `TestYAMLParsesDurations` in `app/config_test.go` pins this.
 
+**TLS is selected by `server.env`, not by the presence of a certificate.**
+`Config.TLSEnabled` is true for every environment except `local` and `test`, so a
+deployment that sets `ENV=production` without mounting a certificate fails at
+startup rather than serving plaintext. `Config.TLSFiles` is the only place that
+rule is applied, and `newServer` calls it *before* opening the database — an
+operator who forgot the certificates should not have to read a postgres dial
+failure first. An empty `Env` counts as `local`, because the tests build a
+`Config` without `withDefaults` and `LoadConfig` always fills the field in.
+
 ## Commands
 
 ```bash
@@ -154,7 +163,8 @@ The pattern `pkg/auth` established, which the rest of the codebase follows:
   package be tested without a broker. The same trick applies to any driver you add.
 - Never hand a body to two owners. Read it once and pass the bytes on.
 - The two binaries are separate on purpose. A worker scales differently from a web
-  server and must not need a listening port.
+  server and must not need a listening port. It shares the config, so `ENV` is
+  loaded there too and means nothing: only `cmd/server` ever calls `serve`.
 
 ## Queue semantics
 

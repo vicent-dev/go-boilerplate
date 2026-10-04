@@ -64,6 +64,25 @@ Durations are written the Go way (`15m`, `24h`), which is why the config is
 parsed with `gopkg.in/yaml.v3`. Do not downgrade that dependency: v2 silently
 parses `15m` as zero, and a zero access TTL issues tokens that expire on arrival.
 
+## Serving TLS
+
+`server.env` (`ENV`, default `local`) decides how the listener is served. TLS is
+on for anything other than `local` and `test`, and then both `server.cert_file`
+(`TLS_CERT_FILE`) and `server.key_file` (`TLS_KEY_FILE`) are required:
+
+```yaml
+server:
+  env: ${ENV:-local}
+  cert_file: ${TLS_CERT_FILE:-}
+  key_file: ${TLS_KEY_FILE:-}
+```
+
+A missing certificate is a startup error, never a silent fall back to plaintext,
+and the certificate is read once when the listener starts — reload it by
+restarting the process. Terminate TLS in a proxy instead by leaving `ENV` at
+`local` or `test`. The worker has no listener, so the environment name does
+nothing for it.
+
 ## The API
 
 ```

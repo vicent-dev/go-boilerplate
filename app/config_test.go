@@ -64,6 +64,9 @@ func TestConfigDefaults(t *testing.T) {
 	// where binding to loopback makes the server unreachable.
 	assert.Equal(t, "0.0.0.0", c.Server.Host)
 	assert.Equal(t, "8080", c.Server.Port)
+	// local, so a fresh clone serves plaintext instead of refusing to start on
+	// certificate files it does not have.
+	assert.Equal(t, "local", c.Server.Env)
 	assert.Equal(t, "5432", c.DB.Port)
 	assert.Equal(t, 100, c.DB.MaxConns)
 	assert.Equal(t, 10, c.DB.MaxIdle)
@@ -183,17 +186,122 @@ rabbit:
 }
 
 func TestLoadConfig(t *testing.T) {
+	t.Setenv("ENV", "test")
+
 	c, err := LoadConfig()
 
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	assert.NotEmpty(t, c.Server.Port)
+	// The environment reaches the listener through the config, which is the
+	// only thing deciding whether it serves TLS.
+	assert.Equal(t, "test", c.Server.Env)
+	assert.False(t, c.TLSEnabled())
 	assert.NotEmpty(t, c.DB.Port)
 	assert.NotEmpty(t, c.Rabbit.Port)
 
 	// The shipped configuration has to yield a usable auth domain, since that is
 	// what a fresh clone boots with.
 	require.NoError(t, c.AuthConfig().Validate())
+}
+
+func TestTLSEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{name: "local", env: "local", want: false},
+		{name: "test", env: "test", want: false},
+		{name: "LOCAL uppercase", env: "LOCAL", want: false},
+		{name: "TEST uppercase", env: "TEST", want: false},
+		{name: "padded", env: " test ", want: false},
+		// Unset is the shipped default, and a hand-built Config skips
+		// withDefaults, so it has to read the same way.
+		{name: "unset", env: "", want: false},
+		{name: "development", env: "development", want: true},
+		{name: "staging", env: "staging", want: true},
+		{name: "production", env: "production", want: true},
+		{name: "prod", env: "prod", want: true},
+		{name: "anything else", env: "qa", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Config{Server: ServerConfig{Env: tt.env}}
+			assert.Equal(t, tt.want, c.TLSEnabled())
+		})
+	}
+}
+
+func TestTLSFiles(t *testing.T) {
+	t.Run("disabled serves nothing", func(t *testing.T) {
+		c := (&Config{Server: ServerConfig{Env: "local"}}).withDefaults()
+
+		certFile, keyFile, err := c.TLSFiles()
+
+		// The example config ships empty paths, so this is what every local run
+		// and the whole test suite rely on.
+		require.NoError(t, err)
+		assert.Empty(t, certFile)
+		assert.Empty(t, keyFile)
+	})
+
+	t.Run("an unset environment is not an error", func(t *testing.T) {
+		c := &Config{}
+
+		certFile, keyFile, err := c.TLSFiles()
+
+		// Without withDefaults, as the server tests build it.
+		require.NoError(t, err)
+		assert.Empty(t, certFile)
+		assert.Empty(t, keyFile)
+	})
+
+	t.Run("both paths are returned", func(t *testing.T) {
+		c := (&Config{Server: ServerConfig{
+			Env:      "production",
+			CertFile: "/etc/tls/cert.pem",
+			KeyFile:  "/etc/tls/key.pem",
+		}}).withDefaults()
+
+		certFile, keyFile, err := c.TLSFiles()
+
+		require.NoError(t, err)
+		assert.Equal(t, "/etc/tls/cert.pem", certFile)
+		assert.Equal(t, "/etc/tls/key.pem", keyFile)
+	})
+
+	t.Run("a missing path is an error, not plaintext", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			certFile string
+			keyFile  string
+		}{
+			{name: "neither"},
+			{name: "cert only", certFile: "/etc/tls/cert.pem"},
+			{name: "key only", keyFile: "/etc/tls/key.pem"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				c := (&Config{Server: ServerConfig{
+					Env:      "production",
+					CertFile: tt.certFile,
+					KeyFile:  tt.keyFile,
+				}}).withDefaults()
+
+				certFile, keyFile, err := c.TLSFiles()
+
+				// Silently serving http where TLS was asked for is the one
+				// outcome this must never produce.
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "production")
+				assert.Empty(t, certFile)
+				assert.Empty(t, keyFile)
+			})
+		}
+	})
 }
 
 // compile time proof that the configuration carries the queue section the queue

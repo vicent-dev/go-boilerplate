@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -20,6 +21,13 @@ import (
 type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port string `yaml:"port"`
+	// Env names the environment the process believes it runs in. It is what
+	// decides whether the listener serves TLS; see Config.TLSEnabled.
+	Env string `yaml:"env"`
+	// CertFile and KeyFile are PEM paths, read once at startup. Both are
+	// required as soon as TLS is enabled.
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
 }
 
 // Addr is the listen address of the http server.
@@ -127,6 +135,9 @@ func (c Config) withDefaults() Config {
 	if c.Server.Host == "" {
 		c.Server.Host = "0.0.0.0"
 	}
+	if c.Server.Env == "" {
+		c.Server.Env = "local"
+	}
 	if c.DB.MaxConns == 0 {
 		c.DB.MaxConns = 100
 	}
@@ -165,6 +176,41 @@ func LoadConfig() (*Config, error) {
 
 	c = c.withDefaults()
 	return &c, nil
+}
+
+// TLSEnabled reports whether the listener serves HTTPS. TLS is on for every
+// environment except local and test, so a deployment that forgets to set ENV
+// stops at startup over missing certificate files instead of quietly serving
+// plaintext in production.
+//
+// An empty Env counts as local, which is what withDefaults fills it in with. A
+// caller that builds a Config by hand therefore gets the shipped behaviour
+// rather than the opposite of it.
+func (c Config) TLSEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(c.Server.Env)) {
+	case "", "local", "test":
+		return false
+	}
+	return true
+}
+
+// TLSFiles returns the certificate and key the listener serves TLS with. Both
+// are empty when TLS is off.
+//
+// A missing path is an error, never a fall back to plaintext: the check happens
+// while the server is being wired, so an environment asking for TLS without
+// shipping certificates never binds the port at all.
+func (c Config) TLSFiles() (certFile, keyFile string, err error) {
+	if !c.TLSEnabled() {
+		return "", "", nil
+	}
+	if c.Server.CertFile == "" || c.Server.KeyFile == "" {
+		return "", "", fmt.Errorf(
+			"env %q enables tls but cert_file or key_file is missing",
+			c.Server.Env,
+		)
+	}
+	return c.Server.CertFile, c.Server.KeyFile, nil
 }
 
 // envRef matches ${VAR} and ${VAR:-default}. Anything else, like a nested
