@@ -1,18 +1,72 @@
 #!/bin/bash
+#
+# Clones this boilerplate under a new name and renames everything that carries
+# the old one: the go module, the import paths, the compose service and network
+# names, and the default database and token issuer names.
+#
+#   ./go-boilerplate            # prompts for the project name
+#   ./go-boilerplate my-saas    # or take it as an argument
 
-read -p "Insert project name: " project_name
+set -euo pipefail
 
-git clone git@github.com:vicent-dev/go-boilerplate.git ${project_name}
+if [ $# -ge 1 ]; then
+    project_name="$1"
+else
+    read -r -p "Insert project name: " project_name
+fi
 
-project_name_underscore=$(echo $project_name | sed "s/-/_/g")
+if [ -z "$project_name" ]; then
+    echo "a project name is required" >&2
+    exit 1
+fi
 
-find ${project_name} -type f -exec sed -i "s/go-boilerplate/$project_name/g" {} + &&
-find ${project_name} -type f -exec sed -i "s/go_boilerplate/$project_name_underscore/g" {} + &&
+if [ -e "$project_name" ]; then
+    echo "$project_name already exists" >&2
+    exit 1
+fi
 
-cp ${project_name}/static/config.example.yaml ${project_name}/static/config.yaml &&
+# Underscored, because that is what a go module path and a database name allow.
+module_name=$(echo "$project_name" | sed 's/-/_/g')
 
-sudo rm -r ${project_name}/.git &&
-rm ${project_name}/install.sh &&
-rm ${project_name}/go-boilerplate &&
-rm ${project_name}/README.md
+git clone git@github.com:vicent-dev/go-boilerplate.git "$project_name"
+cd "$project_name"
 
+# The boilerplate's own git history and scaffolding go first: sed must not walk
+# into .git and rewrite objects, and the new project starts its own history.
+rm -rf .git install.sh go-boilerplate
+
+# Two passes, longest first. "go-boilerplate" has to become the module path
+# before the bare "boilerplate" pass can reach the places that use it as a
+# prefix, such as the compose container names and the default token issuer.
+find . -type f \
+    -not -path './.git/*' \
+    -exec sed -i \
+        -e "s/go-boilerplate/$module_name/g" \
+        -e "s/go_boilerplate/$module_name/g" \
+        {} +
+
+find . -type f \
+    -not -path './.git/*' \
+    -exec sed -i \
+        -e "s/boilerplate/$module_name/g" \
+        {} +
+
+# The embedded config is gitignored, so the new project needs its own copy.
+cp static/config.example.yaml static/config.yaml
+
+git init -q
+git add -A
+git commit -q -m "Initial commit from go-boilerplate"
+
+cat <<EOF
+
+Created $project_name.
+
+  cd $project_name
+  make install
+  make test
+
+Then start the infrastructure and the api:
+
+  docker compose up --build
+EOF

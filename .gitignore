@@ -1,3 +1,19 @@
+# the real config is embedded at compile time and never committed
 static/config.yaml
+
 build/
-go.sum
+bin/
+
+# The compiled binaries, anchored to the repository root on purpose. Without
+# the leading slash these also match the cmd/rabbit/ directory, which silently
+# dropped the worker's entrypoint from every commit.
+/main
+/server
+/rabbit
+
+# only .env is ignored: .env* would also swallow .env.example, which is meant
+# to be committed.
+.env
+
+# local overrides of the example config
+*.local.yaml
